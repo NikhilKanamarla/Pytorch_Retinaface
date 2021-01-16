@@ -11,6 +11,7 @@ import cv2
 from models.retinaface import RetinaFace
 from utils.box_utils import decode, decode_landm
 from utils.timer import Timer
+import pdb
 
 
 parser = argparse.ArgumentParser(description='Retinaface')
@@ -67,8 +68,10 @@ def load_model(model, pretrained_path, load_to_cpu):
 
 
 if __name__ == '__main__':
+    
+    #set into prediction mode 
     torch.set_grad_enabled(False)
-
+    #cfg is the backbone 
     cfg = None
     if args.network == "mobile0.25":
         cfg = cfg_mnet
@@ -90,12 +93,14 @@ if __name__ == '__main__':
 
     with open(testset_list, 'r') as fr:
         test_dataset = fr.read().split()
+    #number of test images
     num_images = len(test_dataset)
-
+    #timer to measure speed of inference 
     _t = {'forward_pass': Timer(), 'misc': Timer()}
 
-    # testing begin
+    # testing begin loop through all test images
     for i, img_name in enumerate(test_dataset):
+        #load image
         image_path = testset_folder + img_name
         img_raw = cv2.imread(image_path, cv2.IMREAD_COLOR)
         img = np.float32(img_raw)
@@ -106,13 +111,13 @@ if __name__ == '__main__':
         im_shape = img.shape
         im_size_min = np.min(im_shape[0:2])
         im_size_max = np.max(im_shape[0:2])
+        #resize image if needed 
         resize = float(target_size) / float(im_size_min)
         # prevent bigger axis from being more than max_size:
         if np.round(resize * im_size_max) > max_size:
             resize = float(max_size) / float(im_size_max)
         if args.origin_size:
             resize = 1
-
         if resize != 1:
             img = cv2.resize(img, None, None, fx=resize, fy=resize, interpolation=cv2.INTER_LINEAR)
         im_height, im_width, _ = img.shape
@@ -122,15 +127,19 @@ if __name__ == '__main__':
         img = torch.from_numpy(img).unsqueeze(0)
         img = img.to(device)
         scale = scale.to(device)
-
+        #tic and toc measures inference time
         _t['forward_pass'].tic()
+        #output of model is location of bounding boxes, confidence of label, landmark locations 
         loc, conf, landms = net(img)  # forward pass
         _t['forward_pass'].toc()
+        #timing the processing of all other tasks during inference process
         _t['misc'].tic()
+        #define anchor postions
         priorbox = PriorBox(cfg, image_size=(im_height, im_width))
         priors = priorbox.forward()
         priors = priors.to(device)
         prior_data = priors.data
+        #get bounding boxes, and confidence scores and landmark locations before nnms
         boxes = decode(loc.data.squeeze(0), prior_data, cfg['variance'])
         boxes = boxes * scale / resize
         boxes = boxes.cpu().numpy()
@@ -166,39 +175,67 @@ if __name__ == '__main__':
         # keep top-K faster NMS
         # dets = dets[:args.keep_top_k, :]
         # landms = landms[:args.keep_top_k, :]
-
+        #combine into one tensor 
         dets = np.concatenate((dets, landms), axis=1)
         _t['misc'].toc()
-
+        
+        
         # --------------------------------------------------------------------
+        #create text file with boxes, confidence and soon landmarks 
+        #saved in folder of test files
         save_name = args.save_folder + img_name[:-4] + ".txt"
         dirname = os.path.dirname(save_name)
         if not os.path.isdir(dirname):
             os.makedirs(dirname)
+        #open text files
+        #pdb.set_trace()
         with open(save_name, "w") as fd:
+            #rename to bboxs
             bboxs = dets
             file_name = os.path.basename(save_name)[:-4] + "\n"
             bboxs_num = str(len(bboxs)) + "\n"
             fd.write(file_name)
             fd.write(bboxs_num)
+            #iterate through all subjects in scene (conncataned bounding boxes, confidence and landmarks) (subjects in scene)
             for box in bboxs:
                 x = int(box[0])
                 y = int(box[1])
                 w = int(box[2]) - int(box[0])
                 h = int(box[3]) - int(box[1])
+                landmarkX1 = box[5]
+                landmarkY1 = box[6]
+                landmarkX2 = box[7]
+                landmarkY2 = box[8]
+                landmarkX3 = box[9]
+                landmarkY3 = box[10]
+                landmarkX4 = box[11]
+                landmarkY4 = box[12]
+                landmarkX5 = box[13]
+                landmarkY5 = box[14]
                 confidence = str(box[4])
-                line = str(x) + " " + str(y) + " " + str(w) + " " + str(h) + " " + confidence + " \n"
+                line = "bounding box coordinates " + str(x) + " " + str(y) + " " + str(w) + " " + str(h) + " confidence " + confidence + " \n"
+                line2 = "landmark coordinates for left eye " + str(landmarkX1) + " " + str(landmarkY1) + ' \n'
+                line3 = "landmark coordinates for right eye "  + str(landmarkX2) + " " + str(landmarkY2) + ' \n'
+                line4 = "landmark coordinates for nose "  + str(landmarkX3) + " " + str(landmarkY3) + ' \n'
+                line5 = "landmark cooridnates for left corner of mouth " + str(landmarkX4) + " " + str(landmarkY4) + ' \n'
+                line6 = "landmark cooridnates for right corner of mouth " + str(landmarkX5) + " " + str(landmarkY5) + ' \n'
+                line = line + line2 + line3 + line4 + line5 + line6
                 fd.write(line)
+                
 
         print('im_detect: {:d}/{:d} forward_pass_time: {:.4f}s misc: {:.4f}s'.format(i + 1, num_images, _t['forward_pass'].average_time, _t['misc'].average_time))
 
-        # save image
+        # save image with bounding boxes, landmarks and confidence 
         if args.save_image:
+            #iterate through all subjects in scene (conncataned bounding boxes, confidence and landmarks) (subjects in scene)
             for b in dets:
+                #applying confidence thereshold for prediction(0.5)
                 if b[4] < args.vis_thres:
                     continue
+                #confidence 
                 text = "{:.4f}".format(b[4])
                 b = list(map(int, b))
+                #b 0,1,2,3 = bounding box and b[5] is confidence (draw bounding box)
                 cv2.rectangle(img_raw, (b[0], b[1]), (b[2], b[3]), (0, 0, 255), 2)
                 cx = b[0]
                 cy = b[1] + 12
@@ -206,6 +243,7 @@ if __name__ == '__main__':
                             cv2.FONT_HERSHEY_DUPLEX, 0.5, (255, 255, 255))
 
                 # landms
+                #x and y locations of each landmark b[5], b[6]
                 cv2.circle(img_raw, (b[5], b[6]), 1, (0, 0, 255), 4)
                 cv2.circle(img_raw, (b[7], b[8]), 1, (0, 255, 255), 4)
                 cv2.circle(img_raw, (b[9], b[10]), 1, (255, 0, 255), 4)
