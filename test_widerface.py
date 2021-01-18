@@ -19,9 +19,9 @@ parser.add_argument('-m', '--trained_model', default='./weights/Resnet50_Final.p
                     type=str, help='Trained state_dict file path to open')
 parser.add_argument('--network', default='resnet50', help='Backbone network mobile0.25 or resnet50')
 parser.add_argument('--origin_size', default=True, type=str, help='Whether use origin image size to evaluate')
-parser.add_argument('--save_folder', default='./widerface_evaluate/widerface_txt/', type=str, help='Dir to save txt results')
-parser.add_argument('--cpu', action="store_true", default=False, help='Use cpu inference')
-parser.add_argument('--dataset_folder', default='./data/widerface/val/images/', type=str, help='dataset path')
+parser.add_argument('--save_folder', default='/datac/nkanama/RetinaFace/save_folder', type=str, help='Dir to save txt results')
+parser.add_argument('--cpu', action="store_true", default=True, help='Use cpu inference')
+parser.add_argument('--dataset_folder', default='/datad/public/widerface/val', type=str, help='dataset path')
 parser.add_argument('--confidence_threshold', default=0.02, type=float, help='confidence_threshold')
 parser.add_argument('--top_k', default=5000, type=int, help='top_k')
 parser.add_argument('--nms_threshold', default=0.4, type=float, help='nms_threshold')
@@ -89,19 +89,19 @@ if __name__ == '__main__':
 
     # testing dataset
     testset_folder = args.dataset_folder
-    testset_list = args.dataset_folder[:-7] + "wider_val.txt"
-
+    testset_list = os.path.join(args.dataset_folder,"wider_val.txt")
+    #open up text file to get list of images 
     with open(testset_list, 'r') as fr:
         test_dataset = fr.read().split()
     #number of test images
     num_images = len(test_dataset)
     #timer to measure speed of inference 
     _t = {'forward_pass': Timer(), 'misc': Timer()}
-
+    #pdb.set_trace()
     # testing begin loop through all test images
     for i, img_name in enumerate(test_dataset):
         #load image
-        image_path = testset_folder + img_name
+        image_path = testset_folder + "/images" + img_name
         img_raw = cv2.imread(image_path, cv2.IMREAD_COLOR)
         img = np.float32(img_raw)
 
@@ -183,12 +183,12 @@ if __name__ == '__main__':
         # --------------------------------------------------------------------
         #create text file with boxes, confidence and soon landmarks 
         #saved in folder of test files
-        save_name = args.save_folder + img_name[:-4] + ".txt"
+        
+        save_name = args.save_folder + '/text_files' + img_name[:-4] + ".txt"
         dirname = os.path.dirname(save_name)
         if not os.path.isdir(dirname):
             os.makedirs(dirname)
         #open text files
-        #pdb.set_trace()
         with open(save_name, "w") as fd:
             #rename to bboxs
             bboxs = dets
@@ -250,8 +250,10 @@ if __name__ == '__main__':
                 cv2.circle(img_raw, (b[11], b[12]), 1, (0, 255, 0), 4)
                 cv2.circle(img_raw, (b[13], b[14]), 1, (255, 0, 0), 4)
             # save image
-            if not os.path.exists("./results/"):
-                os.makedirs("./results/")
-            name = "./results/" + str(i) + ".jpg"
+            #pdb.set_trace()
+            image_path = args.save_folder + '/images'
+            if not os.path.exists(image_path):
+                os.makedirs(image_path)
+            name = image_path + "/" + str(i) + ".jpg"
             cv2.imwrite(name, img_raw)
 
