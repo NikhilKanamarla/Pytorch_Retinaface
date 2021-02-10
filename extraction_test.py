@@ -21,7 +21,7 @@ parser.add_argument('--network', default='resnet50', help='Backbone network mobi
 parser.add_argument('--origin_size', default=True, type=str, help='Whether use origin image size to evaluate')
 parser.add_argument('--save_folder', default='/datac/nkanama/RetinaFace/save_folder_FFHQ', type=str, help='Dir to save txt results')
 parser.add_argument('--cpu', action="store_true", default=False, help='Use cpu inference')
-parser.add_argument('--dataset_folder', default='/datad/public/ffhq-dataset/coreImageData1024x1024', type=str, help='dataset path')
+parser.add_argument('--dataset_folder', default='/n/owens-data1/mnt/big2/data/public/ffhq-dataset/coreImageData1024x1024', type=str, help='dataset path')
 parser.add_argument('--confidence_threshold', default=0.02, type=float, help='confidence_threshold')
 parser.add_argument('--top_k', default=5000, type=int, help='top_k')
 parser.add_argument('--nms_threshold', default=0.4, type=float, help='nms_threshold')
@@ -246,11 +246,17 @@ if __name__ == '__main__':
                 #pdb.set_trace()
                 #download cropped regions of facial landmarks
                 leftEyeName = crop_path + '/' + str(i) + 'leftEye.jpg'
-                cropped_left_eye = img_raw[int(b[6])-36:int(b[6])+36,int(b[5])-36:int(b[5])+36]
+                cropped_left_eye = img_raw[max(int(b[6])-128,0):min(int(b[6])+128,len(img_raw[0])),max(int(b[5])-128,0):min(int(b[5])+128,len(img_raw))]
                 cv2.imwrite(leftEyeName, cropped_left_eye)
                 rightEyeName = crop_path + '/' + str(i) + 'rightEye.jpg'
-                cropped_right_eye = img_raw[int(b[8])-36:int(b[8])+36,int(b[7])-36:int(b[7])+36]
+                cropped_right_eye = img_raw[max(int(b[8])-128,0):min(int(b[8])+128,len(img_raw[0])),max(int(b[7])-128,0):min(int(b[7])+128,len(img_raw))]
                 cv2.imwrite(rightEyeName, cropped_right_eye)
+                noseName = crop_path + '/' + str(i) + 'nose.jpg'
+                cropped_nose = img_raw[max(int(b[10])-128,0):min(int(b[10])+128,len(img_raw[0])),max(int(b[9])-128,0):min(int(b[9])+128,len(img_raw))]
+                cv2.imwrite(noseName, cropped_nose)
+                mouthName = crop_path + '/' + str(i) + 'mouth.jpg'
+                cropped_mouth = img_raw[max(int(b[12])-128,0):min(int(b[14])+128,len(img_raw[0])), max(int(b[11])-128,0):min(int(b[13])+128,len(img_raw))]
+                cv2.imwrite(mouthName, cropped_mouth)
 
                 #confidence 
                 text = "{:.4f}".format(b[4])
