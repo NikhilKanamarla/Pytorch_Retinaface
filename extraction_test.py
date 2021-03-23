@@ -19,14 +19,16 @@ parser.add_argument('-m', '--trained_model', default='./weights/Resnet50_Final.p
                     type=str, help='Trained state_dict file path to open')
 parser.add_argument('--network', default='resnet50', help='Backbone network mobile0.25 or resnet50')
 parser.add_argument('--origin_size', default=True, type=str, help='Whether use origin image size to evaluate')
+#gpu2 below
 parser.add_argument('--save_folder', default='/datac/nkanama/RetinaFace/save_folder_FFHQ', type=str, help='Dir to save txt results')
+#parser.add_argument('--save_folder', default='/datad/nkanama/ffhq-dataset/save_folder_ffhq', type=str, help='Dir to save txt results')
 parser.add_argument('--cpu', action="store_true", default=False, help='Use cpu inference')
-parser.add_argument('--dataset_folder', default='/n/owens-data1/mnt/big2/data/public/ffhq-dataset/coreImageData1024x1024', type=str, help='dataset path')
+parser.add_argument('--dataset_folder', default='/datad/nkanama/ffhq-dataset/coreImageData1024x1024', type=str, help='dataset path')
 parser.add_argument('--confidence_threshold', default=0.02, type=float, help='confidence_threshold')
 parser.add_argument('--top_k', default=5000, type=int, help='top_k')
 parser.add_argument('--nms_threshold', default=0.4, type=float, help='nms_threshold')
 parser.add_argument('--keep_top_k', default=750, type=int, help='keep_top_k')
-parser.add_argument('-s', '--save_image', action="store_true", default=False, help='show detection results')
+parser.add_argument('-s', '--save_image', action="store_true", default=True, help='show detection results')
 parser.add_argument('--vis_thres', default=0.5, type=float, help='visualization_threshold')
 args = parser.parse_args()
 
@@ -84,7 +86,7 @@ if __name__ == '__main__':
     print('Finished loading model!')
     print(net)
     cudnn.benchmark = True
-    device = torch.device("cpu" if args.cpu else "cuda")
+    device = torch.device("cuda:8")
     net = net.to(device)
 
     # testing dataset
@@ -102,6 +104,8 @@ if __name__ == '__main__':
     
     # testing begin loop through all test images
     for i, img_name in enumerate(os.listdir(testset_folder)):
+        if(i < 59375):
+            continue
         #load image
         image_path = testset_folder + '/' + img_name
         img_raw = cv2.imread(image_path, cv2.IMREAD_COLOR)
@@ -185,7 +189,7 @@ if __name__ == '__main__':
         # --------------------------------------------------------------------
         #create text file with boxes, confidence and soon landmarks 
         #saved in folder of test files
-        #pdb.set_trace()
+
         save_name = args.save_folder + '/text_files/' + img_name[:-4] + ".txt"
         dirname = os.path.dirname(save_name)
         if not os.path.isdir(dirname):
@@ -230,7 +234,6 @@ if __name__ == '__main__':
         # save image with bounding boxes, landmarks and confidence 
         if args.save_image:
             # save image
-            #pdb.set_trace()
             image_path = args.save_folder + '/images'
             if not os.path.exists(image_path):
                 os.makedirs(image_path)
@@ -238,12 +241,23 @@ if __name__ == '__main__':
             if not os.path.exists(crop_path):
                 os.makedirs(crop_path)
 
+            #pdb.set_trace()
             #iterate through all subjects in scene (conncataned bounding boxes, confidence and landmarks) (subjects in scene)
             for b in dets:
                 #applying confidence thereshold for prediction(0.5)
                 if b[4] < args.vis_thres:
                     continue
-                #pdb.set_trace()
+
+                #check wether detection is valid    
+                execute = True    
+                for x in b:
+                    if x < 0 or x > 1024:
+                        execute = False
+                        break
+                if(execute == False):
+                    continue
+    
+                
                 #download cropped regions of facial landmarks
                 leftEyeName = crop_path + '/' + str(i) + 'leftEye.jpg'
                 cropped_left_eye = img_raw[max(int(b[6])-128,0):min(int(b[6])+128,len(img_raw[0])),max(int(b[5])-128,0):min(int(b[5])+128,len(img_raw))]
